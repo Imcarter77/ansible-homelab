@@ -4,21 +4,36 @@
   gather_facts: true
   become: false
 
-  tasks:
-    - name: Show node hostname
-      ansible.builtin.command: hostname
-      register: node_hostname
-      changed_when: false
+  vars:
+    disk_warning_threshold: 80
+    memory_warning_threshold_percent: 10
 
-    - name: Show root filesystem usage
-      ansible.builtin.command: df -h /
+  tasks:
+    - name: Check root filesystem usage
+      ansible.builtin.command: df -P /
       register: disk_usage
       changed_when: false
+
+    - name: Check CPU load averages
+      ansible.builtin.command: cat /proc/loadavg
+      register: cpu_load
+      changed_when: false
+
+    - name: Calculate health metrics
+      ansible.builtin.set_fact:
+        root_disk_used_percent: "{{ disk_usage.stdout_lines[1].split()[4] | regex_replace('%', '') | int }}"
+        memory_free_percent: "{{ (ansible_facts['memory_mb']['real']['free'] * 100 / ansible_facts['memory_mb']['real']['total']) | round(1) }}"
 
     - name: Display node health summary
       ansible.builtin.debug:
         msg:
-          - "Hostname: {{ node_hostname.stdout }}"
-          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
-          - "Uptime: {{ ansible_uptime_seconds // 3600 }} hours"
+          - "Hostname: {{ ansible_facts['hostname'] }}"
+          - "OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+          - "Uptime: {{ (ansible_facts['uptime_seconds'] / 3600) | round(1) }} hours"
+          - "CPU cores: {{ ansible_facts['processor_vcpus'] }}"
+          - "Load averages (1, 5, 15 min): {{ cpu_load.stdout.split()[0:3] | join(', ') }}"
+          - "Memory total: {{ (ansible_facts['memory_mb']['real']['total'] / 1024) | round(2) }} GiB"
+          - "Free memory: {{ (ansible_facts['memory_mb']['real']['free'] / 1024) | round(2) }} GiB ({{ memory_free_percent }}%)"
           - "Root filesystem: {{ disk_usage.stdout_lines[1] }}"
+          - "Disk status: {{ 'WARNING' if root_disk_used_percent | int >= disk_warning_threshold else 'OK' }}"
+          - "Memory status: {{ 'WARNING' if memory_free_percent | float < memory_warning_threshold_percent else 'OK' }}"
