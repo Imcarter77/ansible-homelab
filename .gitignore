@@ -1,0 +1,16 @@
+# Secrets and credentials
+*.vault
+vault-password*
+.env
+.env.*
+
+# SSH private keys
+id_rsa
+id_ed25519
+*.pem
+*.key
+
+# Ansible temporary files
+*.retry
+__pycache__/
+

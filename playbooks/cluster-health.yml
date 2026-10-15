@@ -1,0 +1,24 @@
+---
+- name: Kubernetes node health check
+  hosts: kubernetes
+  gather_facts: true
+  become: false
+
+  tasks:
+    - name: Show node hostname
+      ansible.builtin.command: hostname
+      register: node_hostname
+      changed_when: false
+
+    - name: Show root filesystem usage
+      ansible.builtin.command: df -h /
+      register: disk_usage
+      changed_when: false
+
+    - name: Display node health summary
+      ansible.builtin.debug:
+        msg:
+          - "Hostname: {{ node_hostname.stdout }}"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "Uptime: {{ ansible_uptime_seconds // 3600 }} hours"
+          - "Root filesystem: {{ disk_usage.stdout_lines[1] }}"
