@@ -14,3 +14,7 @@ id_ed25519
 *.retry
 __pycache__/
 
+
+# Local homelab inventory (publish only example files)
+inventory/hosts.ini
+!inventory/hosts.ini.example

@@ -1,0 +1,14 @@
+[k8s_control]
+k8s-control ansible_host=192.0.2.10
+
+[k8s_workers]
+k8s-worker01 ansible_host=192.0.2.11
+k8s-worker02 ansible_host=192.0.2.12
+
+[kubernetes:children]
+k8s_control
+k8s_workers
+
+[kubernetes:vars]
+ansible_user=YOUR_SSH_USERNAME
+ansible_become=false
