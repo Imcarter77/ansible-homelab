@@ -1,0 +1,45 @@
+---
+- name: Check root filesystem usage
+  ansible.builtin.command: df -P /
+  register: node_health_disk_usage
+  changed_when: false
+
+- name: Check CPU load averages
+  ansible.builtin.command: cat /proc/loadavg
+  register: node_health_cpu_load
+  changed_when: false
+
+- name: Calculate health metrics
+  ansible.builtin.set_fact:
+    node_health_root_disk_used_percent: "{{ node_health_disk_usage.stdout_lines[1].split()[4] | regex_replace('%', '') | int }}"
+    node_health_memory_free_percent: "{{ (ansible_facts['memory_mb']['real']['free'] * 100 / ansible_facts['memory_mb']['real']['total']) | round(1) }}"
+
+- name: Display node health summary
+  ansible.builtin.debug:
+    msg:
+      - "Hostname: {{ ansible_facts['hostname'] }}"
+      - "OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+      - "Uptime: {{ (ansible_facts['uptime_seconds'] / 3600) | round(1) }} hours"
+      - "CPU cores: {{ ansible_facts['processor_vcpus'] }}"
+      - "Load averages (1, 5, 15 min): {{ node_health_cpu_load.stdout.split()[0:3] | join(', ') }}"
+      - "Memory total: {{ (ansible_facts['memory_mb']['real']['total'] / 1024) | round(2) }} GiB"
+      - "Free memory: {{ (ansible_facts['memory_mb']['real']['free'] / 1024) | round(2) }} GiB ({{ node_health_memory_free_percent }}%)"
+      - "Root filesystem: {{ node_health_disk_usage.stdout_lines[1] }}"
+      - "Disk status: {{ 'WARNING' if node_health_root_disk_used_percent >= disk_warning_threshold else 'OK' }}"
+      - "Memory status: {{ 'WARNING' if node_health_memory_free_percent | float < memory_warning_threshold_percent else 'OK' }}"
+
+- name: Check containerd service status
+  ansible.builtin.service_facts:
+
+- name: Check kubelet service status
+  ansible.builtin.debug:
+    msg:
+      - "containerd: {{ ansible_facts['services']['containerd.service']['state'] | default('unknown') }}"
+      - "kubelet: {{ ansible_facts['services']['kubelet.service']['state'] | default('unknown') }}"
+
+
+- name: Display Kubernetes service status
+  ansible.builtin.debug:
+    msg:
+      - "containerd: {{ node_health_containerd_status.stdout | default('unknown') }}"
+      - "kubelet: {{ node_health_kubelet_status.stdout | default('unknown') }}"
